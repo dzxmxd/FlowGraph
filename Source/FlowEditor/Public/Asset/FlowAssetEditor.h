@@ -47,6 +47,8 @@ protected:
 
 #if ENABLE_SEARCH_IN_ASSET_EDITOR
 	TSharedPtr<class SSearchBrowser> SearchBrowser;
+#else
+	TSharedPtr<class SFindInFlow> SearchBrowser;
 #endif
 
 	/** Runtime message log, with the log listing that it reflects */
@@ -110,9 +112,7 @@ private:
 	TSharedRef<SDockTab> SpawnTab_Graph(const FSpawnTabArgs& Args) const;
 	TSharedRef<SDockTab> SpawnTab_Palette(const FSpawnTabArgs& Args) const;
 	TSharedRef<SDockTab> SpawnTab_RuntimeLog(const FSpawnTabArgs& Args) const;
-#if ENABLE_SEARCH_IN_ASSET_EDITOR
 	TSharedRef<SDockTab> SpawnTab_Search(const FSpawnTabArgs& Args) const;
-#endif
 	TSharedRef<SDockTab> SpawnTab_ValidationLog(const FSpawnTabArgs& Args) const;
 
 public:
@@ -130,10 +130,7 @@ private:
 
 protected:
 	virtual void ValidateAsset(FFlowMessageLog& MessageLog);
-
-#if ENABLE_SEARCH_IN_ASSET_EDITOR
 	virtual void SearchInAsset();
-#endif
 
 	void EditAssetDefaults_Clicked() const;
 
@@ -160,4 +157,8 @@ public:
 
 protected:
 	void OnLogTokenClicked(const TSharedRef<class IMessageToken>& Token) const;
+
+public:
+	// Find in flow
+	void JumpToNode(const UEdGraphNode* Node) const;
 };

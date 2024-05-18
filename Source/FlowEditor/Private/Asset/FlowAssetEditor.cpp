@@ -31,6 +31,8 @@
 
 #if ENABLE_SEARCH_IN_ASSET_EDITOR
 #include "Source/Private/Widgets/SSearchBrowser.h"
+#else
+#include "Find/FindInFlow.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "FlowAssetEditor"
@@ -128,14 +130,12 @@ void FFlowAssetEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& 
 				.SetDisplayName(LOCTEXT("RuntimeLog", "Runtime Log"))
 				.SetGroup(WorkspaceMenuCategoryRef)
 				.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "Kismet.Tabs.CompilerResults"));
-
-#if ENABLE_SEARCH_IN_ASSET_EDITOR
+	
 	InTabManager->RegisterTabSpawner(SearchTab, FOnSpawnTab::CreateSP(this, &FFlowAssetEditor::SpawnTab_Search))
 				.SetDisplayName(LOCTEXT("SearchTab", "Search"))
 				.SetGroup(WorkspaceMenuCategoryRef)
 				.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "Kismet.Tabs.FindResults"));
-#endif
-
+	
 	InTabManager->RegisterTabSpawner(ValidationLogTab, FOnSpawnTab::CreateSP(this, &FFlowAssetEditor::SpawnTab_ValidationLog))
 				.SetDisplayName(LOCTEXT("ValidationLog", "Validation Log"))
 				.SetGroup(WorkspaceMenuCategoryRef)
@@ -150,9 +150,7 @@ void FFlowAssetEditor::UnregisterTabSpawners(const TSharedRef<class FTabManager>
 	InTabManager->UnregisterTabSpawner(GraphTab);
 	InTabManager->UnregisterTabSpawner(ValidationLogTab);
 	InTabManager->UnregisterTabSpawner(PaletteTab);
-#if ENABLE_SEARCH_IN_ASSET_EDITOR
 	InTabManager->UnregisterTabSpawner(SearchTab);
-#endif
 }
 
 void FFlowAssetEditor::InitToolMenuContext(FToolMenuContext& MenuContext)
@@ -246,7 +244,6 @@ TSharedRef<SDockTab> FFlowAssetEditor::SpawnTab_RuntimeLog(const FSpawnTabArgs& 
 		];
 }
 
-#if ENABLE_SEARCH_IN_ASSET_EDITOR
 TSharedRef<SDockTab> FFlowAssetEditor::SpawnTab_Search(const FSpawnTabArgs& Args) const
 {
 	check(Args.GetTabId() == SearchTab);
@@ -261,7 +258,6 @@ TSharedRef<SDockTab> FFlowAssetEditor::SpawnTab_Search(const FSpawnTabArgs& Args
 			]
 		];
 }
-#endif
 
 TSharedRef<SDockTab> FFlowAssetEditor::SpawnTab_ValidationLog(const FSpawnTabArgs& Args) const
 {
@@ -376,12 +372,10 @@ void FFlowAssetEditor::BindToolbarCommands()
 	ToolkitCommands->MapAction(ToolbarCommands.ValidateAsset,
 								FExecuteAction::CreateSP(this, &FFlowAssetEditor::ValidateAsset_Internal),
 								FCanExecuteAction());
-
-#if ENABLE_SEARCH_IN_ASSET_EDITOR
+	
 	ToolkitCommands->MapAction(ToolbarCommands.SearchInAsset,
 								FExecuteAction::CreateSP(this, &FFlowAssetEditor::SearchInAsset),
 								FCanExecuteAction());
-#endif
 
 	ToolkitCommands->MapAction(ToolbarCommands.EditAssetDefaults,
 								FExecuteAction::CreateSP(this, &FFlowAssetEditor::EditAssetDefaults_Clicked),
@@ -424,13 +418,11 @@ void FFlowAssetEditor::ValidateAsset(FFlowMessageLog& MessageLog)
 	FlowAsset->ValidateAsset(MessageLog);
 }
 
-#if ENABLE_SEARCH_IN_ASSET_EDITOR
 void FFlowAssetEditor::SearchInAsset()
 {
 	TabManager->TryInvokeTab(SearchTab);
 	SearchBrowser->FocusForUse();
 }
-#endif
 
 void FFlowAssetEditor::EditAssetDefaults_Clicked() const
 {
@@ -476,6 +468,8 @@ void FFlowAssetEditor::CreateWidgets()
 	// Search
 #if ENABLE_SEARCH_IN_ASSET_EDITOR
 	SearchBrowser = SNew(SSearchBrowser, GetFlowAsset());
+#else
+	SearchBrowser = SNew(SFindInFlow, SharedThis(this));
 #endif
 
 	// Logs
@@ -581,4 +575,11 @@ void FFlowAssetEditor::OnLogTokenClicked(const TSharedRef<IMessageToken>& Token)
 	}
 }
 
+void FFlowAssetEditor::JumpToNode(const UEdGraphNode* Node) const
+{
+	if (GetFlowGraph().IsValid())
+	{
+		GetFlowGraph()->JumpToNode(Node, false);
+	}
+}
 #undef LOCTEXT_NAMESPACE
