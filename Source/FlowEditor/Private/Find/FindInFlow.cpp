@@ -4,6 +4,7 @@
 #include "FlowAsset.h"
 #include "Asset/FlowAssetEditor.h"
 #include "EdGraph/EdGraph.h"
+#include "Graph/FlowGraphEditor.h"
 #include "EdGraph/EdGraphNode.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Views/ITypedTableView.h"
@@ -266,7 +267,6 @@ void SFindInFlow::MatchTokens(const TArray<FString>& Tokens)
 			FString NodeDescription = FlowNode->GetNodeDescription();
 			NodeSearchString += NodeDescription;
 			
-			FlowNode->GetFlowNode()->IsA(UFlowNode_SubGraph::StaticClass());
 			UFlowNode_SubGraph* SubGraphNode = Cast<UFlowNode_SubGraph>(FlowNode->GetFlowNode());
 			if (bFindInSubGraph && SubGraphNode)
 			{
