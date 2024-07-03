@@ -36,10 +36,13 @@ public:
 	FFindInFlowResult(const FString& InValue);
 	
 	/** Create a flow node result */
-	FFindInFlowResult(const FString& InValue, TSharedPtr<FFindInFlowResult>& InParent, UEdGraphNode* InNode);
+	FFindInFlowResult(const FString& InValue, TSharedPtr<FFindInFlowResult>& InParent, UEdGraphNode* InNode, bool bInIsSubGraphNode = false);
 
 	/** Called when user clicks on the search item */
 	FReply OnClick(TWeakPtr<class FFlowAssetEditor> FlowAssetEditor,  TSharedPtr<FFindInFlowResult> Root);
+	
+	/** Called when user double clicks on the search item */
+	FReply OnDoubleClick(TSharedPtr<FFindInFlowResult> Root);
 
 	/** Create an icon to represent the result */
 	TSharedRef<SWidget>	CreateIcon() const;
@@ -53,6 +56,9 @@ public:
 	/** Gets the node type */
 	FString GetNodeTypeText() const;
 
+	/** Gets the node tool tip */
+	FText GetToolTipText() const;
+
 	/** Any children listed under this flow node (decorators and services) */
 	TArray< TSharedPtr<FFindInFlowResult> > Children;
 
@@ -64,6 +70,9 @@ public:
 
 	/** Search result parent */
 	TWeakPtr<FFindInFlowResult> Parent;
+
+	/** Whether this item is a subgraph node */
+	bool bIsSubGraphNode = false;
 };
 
 /** Widget for searching for (Flow nodes) across focused FlowNodes */
@@ -93,6 +102,9 @@ private:
 
 	/** Called when user clicks on a new result */
 	void OnTreeSelectionChanged(FSearchResult Item, ESelectInfo::Type SelectInfo);
+	
+	/* Called when user double clicks on a new result */
+	void OnTreeSelectionDoubleClicked( FSearchResult Item );
 
 	/** Called when whether find in sub graph changed */
 	void OnFindInSubGraphStateChanged(ECheckBoxState CheckBoxState);

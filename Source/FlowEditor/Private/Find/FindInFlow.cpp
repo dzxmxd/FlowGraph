@@ -17,6 +17,7 @@
 #include "Math/Color.h"
 #include "Misc/Attribute.h"
 #include "SlotBase.h"
+#include "Graph/FlowGraphUtils.h"
 #include "Graph/Nodes/FlowGraphNode.h"
 #include "Nodes/FlowNode.h"
 #include "Nodes/Route/FlowNode_SubGraph.h"
@@ -48,8 +49,8 @@ FFindInFlowResult::FFindInFlowResult(const FString& InValue)
 {
 }
 
-FFindInFlowResult::FFindInFlowResult(const FString& InValue, TSharedPtr<FFindInFlowResult>& InParent, UEdGraphNode* InNode)
-	: Value(InValue), GraphNode(InNode), Parent(InParent)
+FFindInFlowResult::FFindInFlowResult(const FString& InValue, TSharedPtr<FFindInFlowResult>& InParent, UEdGraphNode* InNode, bool bInIsSubGraphNode)
+	: Value(InValue), GraphNode(InNode), Parent(InParent), bIsSubGraphNode(bInIsSubGraphNode)
 {
 }
 
@@ -67,7 +68,7 @@ FReply FFindInFlowResult::OnClick(TWeakPtr<class FFlowAssetEditor> FlowAssetEdit
 {
 	if (FlowAssetEditorPtr.IsValid() && GraphNode.IsValid())
 	{
-		if (Parent.IsValid() && Parent.HasSameObject(Root.Get()))
+		if (Parent.IsValid() && !bIsSubGraphNode)
 		{
 			FlowAssetEditorPtr.Pin()->JumpToNode(GraphNode.Get());
 		}
@@ -80,11 +81,38 @@ FReply FFindInFlowResult::OnClick(TWeakPtr<class FFlowAssetEditor> FlowAssetEdit
 	return FReply::Handled();
 }
 
+FReply FFindInFlowResult::OnDoubleClick(TSharedPtr<FFindInFlowResult> Root)
+{
+	if (!Parent.IsValid() || !bIsSubGraphNode)
+	{
+		return FReply::Handled();
+	}
+	const UFlowGraphNode* ParentGraphNode = Cast<UFlowGraphNode>(Parent.Pin()->GraphNode);
+	if (!ParentGraphNode || !ParentGraphNode->GetFlowNode())
+	{
+		return FReply::Handled();
+	}
+	
+	if (UObject* AssetToEdit = ParentGraphNode->GetFlowNode()->GetAssetToEdit())
+	{
+		UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+		if (AssetEditorSubsystem->OpenEditorForAsset(AssetToEdit))
+		{
+			if (const TSharedPtr<FFlowAssetEditor> FlowAssetEditor = FFlowGraphUtils::GetFlowAssetEditor(GraphNode->GetGraph()))
+			{
+				FlowAssetEditor->JumpToNode(GraphNode.Get());
+			}
+		}
+	}
+	
+	return FReply::Handled();
+}
+
 FString FFindInFlowResult::GetDescriptionText() const
 {
-	if (const UFlowGraphNode* FlowNode = Cast<UFlowGraphNode>(GraphNode.Get()))
+	if (const UFlowGraphNode* FlowGraphNode = Cast<UFlowGraphNode>(GraphNode.Get()))
 	{
-		return FlowNode->GetNodeDescription();
+		return FlowGraphNode->GetNodeDescription();
 	}
 
 	return FString();
@@ -105,9 +133,10 @@ FString FFindInFlowResult::GetNodeTypeText() const
 	if (GraphNode.IsValid())
 	{
 		FString NodeClassName;
-		if (const UFlowGraphNode* FlowNode = Cast<UFlowGraphNode>(GraphNode.Get()))
+		const UFlowGraphNode* FlowGraphNode = Cast<UFlowGraphNode>(GraphNode.Get());
+		if (FlowGraphNode && FlowGraphNode->GetFlowNode())
 		{
-			NodeClassName = FlowNode->GetFlowNode()->GetClass()->GetName();
+			NodeClassName = FlowGraphNode->GetFlowNode()->GetClass()->GetName();
 		}
 		else
 		{
@@ -125,6 +154,16 @@ FString FFindInFlowResult::GetNodeTypeText() const
 	}
 
 	return FString();
+}
+
+FText FFindInFlowResult::GetToolTipText() const
+{
+	FString ToolTipStr = TEXT("Click to focus on nodes.");
+	if (bIsSubGraphNode)
+	{
+		ToolTipStr += TEXT("\nDouble click to focus on subgraph nodes");
+	}
+	return FText::FromString(ToolTipStr);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -178,6 +217,7 @@ void SFindInFlow::Construct( const FArguments& InArgs, TSharedPtr<FFlowAssetEdit
 					.OnGenerateRow(this, &SFindInFlow::OnGenerateRow)
 					.OnGetChildren(this, &SFindInFlow::OnGetChildren)
 					.OnSelectionChanged(this, &SFindInFlow::OnTreeSelectionChanged)
+					.OnMouseButtonDoubleClick(this, &SFindInFlow::OnTreeSelectionDoubleClicked)
 					.SelectionMode(ESelectionMode::Multi)
 				]
 			]
@@ -262,12 +302,12 @@ void SFindInFlow::MatchTokens(const TArray<FString>& Tokens)
 		FSearchResult NodeResult(new FFindInFlowResult(NodeName, RootSearchResult, Node));
 		FString NodeSearchString = NodeName + Node->GetClass()->GetName() + Node->NodeComment;
 
-		if (const UFlowGraphNode* FlowNode = Cast<UFlowGraphNode>(Node))
+		if (const UFlowGraphNode* FlowGraphNode = Cast<UFlowGraphNode>(Node))
 		{
-			FString NodeDescription = FlowNode->GetNodeDescription();
+			FString NodeDescription = FlowGraphNode->GetNodeDescription();
 			NodeSearchString += NodeDescription;
 			
-			UFlowNode_SubGraph* SubGraphNode = Cast<UFlowNode_SubGraph>(FlowNode->GetFlowNode());
+			UFlowNode_SubGraph* SubGraphNode = Cast<UFlowNode_SubGraph>(FlowGraphNode->GetFlowNode());
 			if (bFindInSubGraph && SubGraphNode)
 			{
 				if (const UFlowAsset* FlowAsset = Cast<UFlowAsset>(SubGraphNode->GetAssetToEdit()))
@@ -300,15 +340,15 @@ void SFindInFlow::MatchTokensInChild(const TArray<FString>& Tokens, UEdGraphNode
 
 	const FString ChildName = Child->GetNodeTitle(ENodeTitleType::ListView).ToString();
 	FString ChildSearchString = ChildName + Child->GetClass()->GetName() + Child->NodeComment;
-	if (const UFlowGraphNode* FlowNode = Cast<UFlowGraphNode>(Child))
+	if (const UFlowGraphNode* FlowGraphNode = Cast<UFlowGraphNode>(Child))
 	{
-		FString NodeDescription = FlowNode->GetNodeDescription();
+		FString NodeDescription = FlowGraphNode->GetNodeDescription();
 		ChildSearchString += NodeDescription;
 	}
 	ChildSearchString = ChildSearchString.Replace(TEXT(" "), TEXT(""));
 	if (StringMatchesSearchTokens(Tokens, ChildSearchString))
 	{
-		const FSearchResult DecoratorResult(new FFindInFlowResult(ChildName, ParentNode, Child));
+		const FSearchResult DecoratorResult(new FFindInFlowResult(ChildName, ParentNode, Child, true));
 		ParentNode->Children.Add(DecoratorResult);
 	}
 }
@@ -316,6 +356,7 @@ void SFindInFlow::MatchTokensInChild(const TArray<FString>& Tokens, UEdGraphNode
 TSharedRef<ITableRow> SFindInFlow::OnGenerateRow( FSearchResult InItem, const TSharedRef<STableViewBase>& OwnerTable )
 {
 	return SNew(STableRow< TSharedPtr<FFindInFlowResult> >, OwnerTable)
+		.ToolTip(SNew(SToolTip).Text(InItem->GetToolTipText()))
 		[
 			SNew(SHorizontalBox)
 			+SHorizontalBox::Slot()
@@ -379,6 +420,14 @@ void SFindInFlow::OnTreeSelectionChanged(FSearchResult Item , ESelectInfo::Type)
 	if (Item.IsValid())
 	{
 		Item->OnClick(FlowAssetEditorPtr, RootSearchResult);
+	}
+}
+
+void SFindInFlow::OnTreeSelectionDoubleClicked(FSearchResult Item)
+{
+	if (Item.IsValid())
+	{
+		Item->OnDoubleClick(RootSearchResult);
 	}
 }
 
