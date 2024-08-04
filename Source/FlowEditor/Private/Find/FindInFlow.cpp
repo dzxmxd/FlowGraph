@@ -310,12 +310,11 @@ void SFindInFlow::MatchTokens(const TArray<FString>& Tokens)
 			UFlowNode_SubGraph* SubGraphNode = Cast<UFlowNode_SubGraph>(FlowGraphNode->GetFlowNode());
 			if (bFindInSubGraph && SubGraphNode)
 			{
-				if (const UFlowAsset* FlowAsset = Cast<UFlowAsset>(SubGraphNode->GetAssetToEdit()))
+				if (const UFlowAsset* FlowAsset = Cast<UFlowAsset>(SubGraphNode->GetAssetToEdit()); FlowAsset && FlowAsset->GetGraph())
 				{
-					for (const TPair<FGuid, UFlowNode*>& Pair : FlowAsset->GetNodes())
+					for (auto ChildIt(FlowAsset->GetGraph()->Nodes.CreateConstIterator()); ChildIt; ++ChildIt)
 					{
-						UEdGraphNode* ChildGraphNode = Pair.Value->GetGraphNode();
-						MatchTokensInChild(Tokens, ChildGraphNode, NodeResult);
+						MatchTokensInChild(Tokens, *ChildIt, NodeResult);
 					}
 				}
 			}
